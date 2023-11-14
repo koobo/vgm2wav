@@ -1,7 +1,6 @@
 # CMake Files
 CMakeFiles/
 CMakeCache.txt
-Makefile
 cmake_install.cmake
 # binaries
 vgm2wav
