@@ -22,23 +22,25 @@ int main(int argc, char** argv)
     //char *infile = NULL;
     char infile[80];
     int iflag = 0;
-    int c;
+    int c = 0;
     int t_sec = 30; // default: 30 seconds of wave
-    int tflag;
-    int sel_voice;
+    int tflag = 0;
+    int sel_voice = 0;
     int sflag = 0;
     int oflag = 0;
     int verbose = 0;
     char *outfile = NULL;
-    int trflag;
-    int tr_sel;
+    int trflag = 0;
+    int tr_sel = 0;
+    int freq_sel = 0;
+    int freqflag = 0;
 
     if (argc < 2) 
     {
         usage();
     }
 
-    while ((c = getopt( argc, argv, "vbt:i:s:o:r:")) != -1 )
+    while ((c = getopt( argc, argv, "vbt:i:s:o:r:f:")) != -1 )
         switch (c)
         {
             case 'v': // all voices
@@ -67,6 +69,10 @@ int main(int argc, char** argv)
               trflag = 1;
               tr_sel = atoi( optarg );
               break;
+            case 'f':
+              freqflag = 1;
+              freq_sel = atoi( optarg );
+              break;
             case '?':
               if (optopt == 'i')
                   fprintf(stderr, "Option -%c requires an argument.\n", optopt);
@@ -82,6 +88,11 @@ int main(int argc, char** argv)
         }
 	
     long sample_rate = 44100; /* number of samples per second */
+    if (freqflag)
+        sample_rate = freq_sel;
+    if (verbose)
+        fprintf(stderr, "Sample rate : %ld\n", sample_rate);
+
 	int track = ( trflag == 1 ) ? tr_sel : 0; /* index of track to play (0 = first) */
 	
     if (!iflag)
@@ -204,7 +215,14 @@ void handle_error( const char* str )
 
 void usage(void)
 {
-    fprintf(stderr, "usage: vgm2wav -i [file] -o [file] [-v] [-r track_num] [-b]\n" );
+    fprintf(stderr, "usage: vgm2wav -i [file] -o [file] [-v] [-r track_num] [-f freq] [-b] [-t secs]\n" );
     fprintf(stderr, "output supports '-' as filename for stdout\n");
+    fprintf(stderr, "-i: input file\n");
+    fprintf(stderr, "-o: output file\n");
+    fprintf(stderr, "-v: all voices\n");
+    fprintf(stderr, "-r: index of track to play (0 is first)\n");
+    fprintf(stderr, "-f: output sample frequency (default 44100)\n");
+    fprintf(stderr, "-b: verbose output\n");
+    fprintf(stderr, "-t: playtime in secs (default 30s or whatever is defined in the file)\n");
     exit( EXIT_FAILURE );
 }
