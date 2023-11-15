@@ -1,0 +1,3 @@
+TARGET=vgm2wav.020fpu
+CPUOPT=-m68020 -mhard-float
+include Makefile.common

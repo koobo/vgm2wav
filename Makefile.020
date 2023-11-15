@@ -1,0 +1,3 @@
+TARGET=vgm2wav.020
+CPUOPT=-m68020 -msoft-float
+include Makefile.common

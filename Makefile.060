@@ -1,0 +1,3 @@
+TARGET=vgm2wav.060
+CPUOPT=-m68060 -mno-bitfield 
+include Makefile.common
