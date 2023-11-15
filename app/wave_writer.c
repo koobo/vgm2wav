@@ -148,8 +148,9 @@ void wave_write_header( void )
 		flush_();
 		
 		/* write header */
-		fseek( file, 0, SEEK_SET );
-		fwrite( h, sizeof h, 1, file );
+		if (fseek( file, 0, SEEK_SET ) == 0) {
+			fwrite( h, sizeof h, 1, file );
+        }
     }
 }
 
