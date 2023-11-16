@@ -12,3 +12,13 @@ clean:
 	make -f Makefile.040 clean
 	make -f Makefile.060 clean
 
+dist:
+	rm -f vgm2wav-gme.lha
+	lha a vgm2wav-gme.lha vgm2wav.000
+	lha a vgm2wav-gme.lha vgm2wav.020
+	lha a vgm2wav-gme.lha vgm2wav.020fpu
+	lha a vgm2wav-gme.lha vgm2wav.040
+	lha a vgm2wav-gme.lha vgm2wav.060
+
+
+
