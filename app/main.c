@@ -34,13 +34,14 @@ int main(int argc, char** argv)
     int tr_sel = 0;
     int freq_sel = 0;
     int freqflag = 0;
+    int output8bit = 0;
 
     if (argc < 2) 
     {
         usage();
     }
 
-    while ((c = getopt( argc, argv, "vbt:i:s:o:r:f:")) != -1 )
+    while ((c = getopt( argc, argv, "vb8t:i:s:o:r:f:")) != -1 )
         switch (c)
         {
             case 'v': // all voices
@@ -73,6 +74,9 @@ int main(int argc, char** argv)
               freqflag = 1;
               freq_sel = atoi( optarg );
               break;
+            case '8':
+              output8bit = 1;
+              break;
             case '?':
               if (optopt == 'i')
                   fprintf(stderr, "Option -%c requires an argument.\n", optopt);
@@ -87,7 +91,7 @@ int main(int argc, char** argv)
               abort();
         }
 	
-    long sample_rate = 44100; /* number of samples per second */
+    unsigned int sample_rate = 44100; /* number of samples per second */
     if (freqflag)
         sample_rate = freq_sel;
     if (verbose)
@@ -167,7 +171,8 @@ int main(int argc, char** argv)
         /* Begin writing to wave file */
         FILE * curfile = wave_open( sample_rate, fname );
         wave_enable_stereo();
-        
+        if (output8bit) wave_set_8bit();
+
         /* Record t_sec (default 10) seconds of track */
         int done = 0;
         while ( gme_tell( emu ) < t_sec * 1000L )
@@ -188,13 +193,17 @@ int main(int argc, char** argv)
         /* Output temp file to stdout if -o - */ 
         if (strcmp (fname, "-" ) == 0)
         {
-            rewind( curfile );
-            size_t buflen;
-            char buf[2048];
-            while (( buflen = fread( buf, 1, sizeof buf, curfile )) > 0 )
-                fwrite( buf, 1, buflen, stdout );
+            errno = 0;
+            rewind(curfile);
+            if (!errno)
+            {
+                size_t buflen;
+                char buf[2048];
+                while ((buflen = fread(buf, 1, sizeof buf, curfile)) > 0)
+                    fwrite(buf, 1, buflen, stdout);
+            }
         }
-	    /* now close the file */
+        /* now close the file */
         wave_close();
     }
 
@@ -215,7 +224,7 @@ void handle_error( const char* str )
 
 void usage(void)
 {
-    fprintf(stderr, "usage: vgm2wav -i [file] -o [file] [-v] [-r track_num] [-f freq] [-b] [-t secs]\n" );
+    fprintf(stderr, "usage: vgm2wav -i [file] -o [file] [-v] [-r track_num] [-f freq] [-b] [-8] [-t secs]\n" );
     fprintf(stderr, "output supports '-' as filename for stdout\n");
     fprintf(stderr, "-i: input file\n");
     fprintf(stderr, "-o: output file\n");
@@ -223,6 +232,7 @@ void usage(void)
     fprintf(stderr, "-r: index of track to play (0 is first)\n");
     fprintf(stderr, "-f: output sample frequency (default 44100)\n");
     fprintf(stderr, "-b: verbose output\n");
+    fprintf(stderr, "-8: output 8-bit WAV instead of 16-bit WAV\n");
     fprintf(stderr, "-t: playtime in secs (default 30s or whatever is defined in the file)\n");
     exit( EXIT_FAILURE );
 }

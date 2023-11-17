@@ -29,6 +29,7 @@ static long  sample_count_;
 static long  sample_rate_;
 static long  buf_pos;
 static int   chan_count;
+static int   output_8bit;
 
 static void exit_with_error( const char* str )
 {
@@ -42,6 +43,7 @@ FILE* wave_open( long sample_rate, const char* filename )
 	sample_rate_  = sample_rate;
 	buf_pos       = header_size;
 	chan_count    = 1;
+    output_8bit   = 0;
 	
 	buf = (unsigned char*) malloc( buf_size * sizeof *buf );
 	if ( !buf )
@@ -64,6 +66,12 @@ void wave_enable_stereo( void )
 	chan_count = 2;
 }
 
+void wave_set_8bit( void )
+{
+    output_8bit = 1;
+}
+
+
 static void flush_()
 {
 	if ( buf_pos && !fwrite( buf, buf_pos, 1, file ) )
@@ -71,33 +79,48 @@ static void flush_()
 	buf_pos = 0;
 }
 
-void wave_write( short const* in, long remain )
+void wave_write(short const *in, int remain)
 {
-	sample_count_ += remain;
-	while ( remain )
-	{
-		if ( buf_pos >= buf_size )
-			flush_();
-		
-		{
-			unsigned char* p = &buf [buf_pos];
-			long n = (buf_size - buf_pos) / sizeof (sample_t);
-			if ( n > remain )
-				n = remain;
-			remain -= n;
-			
-			/* convert to LSB first format */
-			while ( n-- )
-			{
-				int s = *in++;
-				*p++ = (unsigned char) s;
-				*p++ = (unsigned char) (s >> 8);
-			}
-			
-			buf_pos = p - buf;
-			assert( buf_pos <= buf_size );
-		}
-	}
+    sample_count_ += remain;
+
+    while (remain)
+    {
+        if (buf_pos >= buf_size)
+            flush_();
+
+        unsigned char *p = &buf[buf_pos];
+        // How many samples fit in the buffer:
+        //long n = (buf_size - buf_pos) / sizeof(sample_t);
+        int n = (buf_size - buf_pos);  // 8-bit samples
+        if (!output_8bit) {
+            n >>= 1; // 16-bit samples
+        }
+        if (n > remain)
+            n = remain;
+        remain -= n;
+
+        if (!output_8bit)
+        {
+            // 16-bit
+            /* convert to LSB first format */
+            while (n--)
+            {
+                unsigned short s = *in++;
+                *p++ = (unsigned char)s;
+                *p++ = (unsigned char)(s >> 8);
+            }
+        }
+        else
+        {
+            // 8-bit, sign flip 
+            while (n--)
+            {
+                *p++ = (unsigned char)(*in++ >> 8) ^ 0x80;
+            }
+        }
+        buf_pos = p - buf;
+        // assert(buf_pos <= buf_size);
+    }
 }
 
 long wave_sample_count( void )
@@ -117,6 +140,9 @@ void wave_write_header( void )
 {
 	if ( file )
 	{
+        unsigned char bits_per_sample = output_8bit ? 8 : 16;
+        unsigned int bytes_per_sample = bits_per_sample / 8;
+
 		/* generate header */
 		unsigned char h [header_size] =
 		{
@@ -130,13 +156,13 @@ void wave_write_header( void )
 			0,0,0,0,        /* sample rate */
 			0,0,0,0,        /* bytes per second */
 			0,0,            /* bytes per sample frame */
-			16,0,           /* bits per sample */
+			bits_per_sample,0, /* bits per sample */
 			'd','a','t','a',
 			0,0,0,0,        /* size of sample data */
 			/* ... */       /* sample data */
 		};
-		long ds = sample_count_ * sizeof (sample_t);
-		int frame_size = chan_count * sizeof (sample_t);
+		long ds = sample_count_ * bytes_per_sample;
+		int frame_size = chan_count * bytes_per_sample;
 		
 		set_le32( h + 0x04, header_size - 8 + ds );
 		h [0x16] = chan_count;
