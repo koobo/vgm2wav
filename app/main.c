@@ -17,6 +17,131 @@
 void handle_error( const char* str );
 void usage( void );
 
+
+
+
+// Ungzip the infile to a temporary file, replace the 
+// infile with the tmp file path.
+bool unGzip(char* infile, char* inflatedFilename, bool verbose)
+{
+    bool success = false;
+    tmpnam(inflatedFilename);
+    strcat(inflatedFilename, ".vgm");
+    gzFile gz = gzopen(infile, "rb");
+    if (!gz)
+    {
+        fprintf(stderr, "Can't open gzip file : %s\n", infile);
+        return false;
+    }
+    else
+    {
+        FILE *outFile = fopen(inflatedFilename, "wb");
+        if (outFile)
+        {
+            const int IO_SIZE = 512;
+            unsigned char ioBuffer[IO_SIZE];
+            int bytesRead = -1;
+            int totalBytesRead = 0;
+            while ((bytesRead = gzread(gz, ioBuffer, IO_SIZE)) != -1)
+            {
+                if (fwrite(ioBuffer, 1, bytesRead, outFile) != bytesRead)
+                {
+                    fprintf(stderr, "Failed to write %ld bytes\n", bytesRead);
+                    break;
+                }
+                totalBytesRead += bytesRead;
+                if (bytesRead < IO_SIZE) {
+                    success = true;
+                    break;
+                }
+            }
+            fclose(outFile);
+            if (verbose)
+                fprintf(stderr, "Gunzipped %ld kB\n", totalBytesRead / 1024);
+            if (success) {
+              strcpy(infile, inflatedFilename);
+            }
+        }
+    }
+    return success;
+}
+
+
+// Deflate the GYM infile to a temporary file, replace the 
+// infile with the tmp file path.
+bool inflateGYM(char *infile, char *inflatedFilename, bool verbose)
+{
+    bool result = false;
+    const int HEADER_SIZE = 428;
+
+    FILE *input = fopen(infile, "rb");
+    fseek(input, 0, SEEK_END);
+    const int size = ftell(input);
+    rewind(input);
+
+    unsigned char *data = (unsigned char *)malloc(size + 1);
+    fread(data, 1, size, input);
+    fclose(input);
+    const int inflatedSize = data[427] << 24 | data[426] << 16 | data[425] << 8 | data[424];
+    if (inflatedSize == 0)
+    {   
+        // Not compressed
+        return result;
+    }
+
+    // Space for inflated data, copy header, then clear the compression indicator
+    unsigned char *inflated = (unsigned char *)malloc(inflatedSize + HEADER_SIZE + 1);
+    memcpy(inflated, data, HEADER_SIZE);
+    inflated[424] = 0;
+    inflated[425] = 0;
+    inflated[426] = 0;
+    inflated[427] = 0;
+
+    // Inflate it
+    z_stream zStream;
+    int ret;
+    zStream.zalloc = Z_NULL;
+    zStream.zfree = Z_NULL;
+    zStream.opaque = Z_NULL;
+    zStream.avail_in = size - HEADER_SIZE;
+    zStream.next_in = (z_const Bytef *)&data[HEADER_SIZE];
+    ret = inflateInit2(&zStream, 0x20 | 15);
+    if (ret != Z_OK)
+    {
+        fprintf(stderr, "Inflate init %ld\n", ret);
+        free(inflated);
+        return result;
+    }
+    zStream.avail_out = inflatedSize;
+    zStream.next_out = (Bytef *)&inflated[HEADER_SIZE];
+    ret = inflate(&zStream, Z_SYNC_FLUSH);
+    if (!(ret == Z_OK || ret == Z_STREAM_END))
+    {
+        fprintf(stderr, "Inflate error %ld\n", ret);
+        free(inflated);
+        return result;
+    }
+    inflateEnd(&zStream);
+
+    // Write into a temp file
+    tmpnam(inflatedFilename);
+    strcat(inflatedFilename, ".sym");
+    FILE *output = fopen(inflatedFilename, "wb");
+    if (output)
+    {
+        const int outSize = inflatedSize + HEADER_SIZE;
+        if (fwrite(inflated, 1, outSize, output) == outSize)
+        {
+            result = true;
+            strcpy(infile, inflatedFilename);
+        }
+        fclose(output);
+    }
+    free(inflated);
+    free(data);
+    return result;
+}
+
 int main(int argc, char** argv)
 {
     // Command-line arguments
@@ -109,53 +234,33 @@ int main(int argc, char** argv)
     /**
      * Convert vgz into vgm if needed
      */
-    char gunzippedFilename[64];
-    bool removeGzTmpFile = false;
+    char inflatedFilename[64];
+    bool removeInflateTmpFile = false;
     char *fileExt = strrchr(infile, '.');
     if (fileExt)
     {
         for (char *p = fileExt; *p; ++p)
             *p = tolower(*p);
+        // Try ungzipping vgz fils
         if (strcmp(fileExt, ".vgz") == 0)
         {
-            tmpnam(gunzippedFilename);            
-            strcat(gunzippedFilename, ".vgm");
-            gzFile gz = gzopen(infile, "rb");
-            if (!gz)
+            if (unGzip(infile, inflatedFilename, verbose))
             {
-                fprintf(stderr, "Can't open gzip file : %s\n", infile);
+                removeInflateTmpFile = true;
             }
-            else
+        }
+        // Try deflating GYM files
+        else if (strcmp(fileExt, ".gym") == 0)
+        {
+            if (inflateGYM(infile, inflatedFilename, verbose))
             {
-                FILE *outFile = fopen(gunzippedFilename, "wb");
-                if (outFile)
-                {
-                    removeGzTmpFile = true;
-                    const int IO_SIZE = 512;
-                    unsigned char ioBuffer[IO_SIZE];
-                    int bytesRead = -1;
-                    int totalBytesRead = 0;
-                    while ((bytesRead = gzread(gz, ioBuffer, IO_SIZE)) != -1)
-                    {
-                        if (fwrite(ioBuffer, 1, bytesRead, outFile) != bytesRead) {
-                            fprintf(stderr, "Failed to write %ld bytes\n", bytesRead);
-                            break;
-                        }
-                        totalBytesRead += bytesRead;
-                        if (bytesRead < IO_SIZE) break;
-                    }
-                    fclose(outFile);
-                    if (verbose)
-                        fprintf(stderr, "Gunzipped %ld kB\n", totalBytesRead / 1024);
-                    strcpy(infile, gunzippedFilename);
-                }
+                removeInflateTmpFile = true;
             }
         }
     }
 
- 
-    Music_Emu* emu;
-	/* Open music file in new emulator */
+    Music_Emu *emu;
+    /* Open music file in new emulator */
 	handle_error( gme_open_file( infile, &emu, sample_rate ) );
 	
     /* Get num voices */
@@ -260,8 +365,8 @@ int main(int argc, char** argv)
 	/* Cleanup */
 	gme_delete( emu );
 	
-    if (removeGzTmpFile) {
-        remove(gunzippedFilename);
+    if (removeInflateTmpFile) {
+        remove(inflatedFilename);
     }
 
 	return 0;
@@ -280,9 +385,9 @@ void usage(void)
 {
     fprintf(stderr, "usage: vgm2wav -i [file] -o [file] [-v] [-r track_num] [-f freq] [-b] [-8] [-t secs]\n" );
     fprintf(stderr, "output supports '-' as filename for stdout\n");
-    fprintf(stderr, "-i: input file\n");
-    fprintf(stderr, "-o: output file\n");
-    fprintf(stderr, "-v: all voices\n");
+    fprintf(stderr, "-i: input file (AY,GBS,GYM,HES,KSS,NSF/NSFE,SAP,SPC,VGM,VGZ)\n");
+    fprintf(stderr, "-o: output file (WAV)\n");
+    fprintf(stderr, "-v: all voices into separate WAVs\n");
     fprintf(stderr, "-r: index of track to play (0 is first)\n");
     fprintf(stderr, "-f: output sample frequency (default 44100)\n");
     fprintf(stderr, "-b: verbose output\n");

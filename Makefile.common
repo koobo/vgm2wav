@@ -87,7 +87,13 @@ ZLIB_SRCA:=zlib/adler32.c \
 	zlib/uncompr.c \
 	zlib/zutil.c 
 
-all: $(TARGET)
+.PHONY: zlib.stamp 
+
+all: zlib.stamp $(TARGET)
+
+zlib.stamp:
+	cd zlib && CC=$(GCC) ./configure
+	touch $@
 
 clean:
 	rm -f $(TARGET) $(TARGET).sym mo_ym2413_emu.zip
