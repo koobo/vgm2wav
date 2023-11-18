@@ -10,6 +10,8 @@
 #include <libgen.h>
 #include <ctype.h>
 
+#include "zlib.h"
+
 #define T_SEC_DEFAULT 30
 
 void handle_error( const char* str );
@@ -20,7 +22,7 @@ int main(int argc, char** argv)
     // Command-line arguments
     int vflag = 0;
     //char *infile = NULL;
-    char infile[80];
+    char infile[128];
     int iflag = 0;
     int c = 0;
     int t_sec = 30; // default: 30 seconds of wave
@@ -103,7 +105,55 @@ int main(int argc, char** argv)
         sprintf(infile, "test.nsf");
     if (verbose)
         fprintf(stderr, "Input file : %s\n", infile);
-	
+
+    /**
+     * Convert vgz into vgm if needed
+     */
+    char gunzippedFilename[64];
+    bool removeGzTmpFile = false;
+    char *fileExt = strrchr(infile, '.');
+    if (fileExt)
+    {
+        for (char *p = fileExt; *p; ++p)
+            *p = tolower(*p);
+        if (strcmp(fileExt, ".vgz") == 0)
+        {
+            tmpnam(gunzippedFilename);            
+            strcat(gunzippedFilename, ".vgm");
+            gzFile gz = gzopen(infile, "rb");
+            if (!gz)
+            {
+                fprintf(stderr, "Can't open gzip file : %s\n", infile);
+            }
+            else
+            {
+                FILE *outFile = fopen(gunzippedFilename, "wb");
+                if (outFile)
+                {
+                    removeGzTmpFile = true;
+                    const int IO_SIZE = 512;
+                    unsigned char ioBuffer[IO_SIZE];
+                    int bytesRead = -1;
+                    int totalBytesRead = 0;
+                    while ((bytesRead = gzread(gz, ioBuffer, IO_SIZE)) != -1)
+                    {
+                        if (fwrite(ioBuffer, 1, bytesRead, outFile) != bytesRead) {
+                            fprintf(stderr, "Failed to write %ld bytes\n", bytesRead);
+                            break;
+                        }
+                        totalBytesRead += bytesRead;
+                        if (bytesRead < IO_SIZE) break;
+                    }
+                    fclose(outFile);
+                    if (verbose)
+                        fprintf(stderr, "Gunzipped %ld kB\n", totalBytesRead / 1024);
+                    strcpy(infile, gunzippedFilename);
+                }
+            }
+        }
+    }
+
+ 
     Music_Emu* emu;
 	/* Open music file in new emulator */
 	handle_error( gme_open_file( infile, &emu, sample_rate ) );
@@ -210,6 +260,10 @@ int main(int argc, char** argv)
 	/* Cleanup */
 	gme_delete( emu );
 	
+    if (removeGzTmpFile) {
+        remove(gunzippedFilename);
+    }
+
 	return 0;
 }
 
