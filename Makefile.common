@@ -87,22 +87,23 @@ ZLIB_SRCA:=zlib/adler32.c \
 	zlib/uncompr.c \
 	zlib/zutil.c 
 
-.PHONY: zlib.stamp 
+#.PHONY: zlib.stamp ym2413.stamp
 
-all: zlib.stamp $(TARGET)
+all: zlib.stamp ym2413.stamp $(TARGET)
 
 zlib.stamp:
 	cd zlib && CC=$(GCC) ./configure
 	touch $@
 
+ym2413.stamp:
+	wget https://www.slack.net/~ant/libs/mo_ym2413_emu.zip
+	cd libgme/gme && unzip -jo ../../mo_ym2413_emu.zip
+	touch $@
+
 clean:
 	rm -f $(TARGET) $(TARGET).sym mo_ym2413_emu.zip
 
-mo_ym2413_emu.zip: 
-	wget https://www.slack.net/~ant/libs/mo_ym2413_emu.zip
-
-libgme/gme/Ym2413_Emu.cpp: mo_ym2413_emu.zip
-	cd libgme/gme && unzip -jo ../../mo_ym2413_emu.zip
+libgme/gme/Ym2413_Emu.cpp: ym2413.stamp
 
 $(TARGET).sym: $(SRC) libgme/gme/Ym2413_Emu.cpp $(ZLIB_SRC)
 	$(GPP) $(CFLAGS) -Wl,-Map,$(TARGET).map,--cref $^ -o $@
