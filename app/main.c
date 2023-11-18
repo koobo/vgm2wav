@@ -128,7 +128,7 @@ bool inflateGYM(char *infile, char *inflatedFilename, bool verbose)
 
     // Write into a temp file
     tmpnam(inflatedFilename);
-    strcat(inflatedFilename, ".sym");
+    strcat(inflatedFilename, ".gym");
     FILE *output = fopen(inflatedFilename, "wb");
     if (output)
     {
