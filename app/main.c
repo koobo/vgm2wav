@@ -9,6 +9,7 @@
 #include <string.h>
 #include <libgen.h>
 #include <ctype.h>
+#include <signal.h>
 
 #include "zlib.h"
 
@@ -17,8 +18,10 @@
 void handle_error( const char* str );
 void usage( void );
 
-
-
+// Global variables to clean up with CTRL+C
+Music_Emu *emu = 0;
+char inflatedFilename_[64];
+bool removeInflateTmpFile = false;
 
 // Ungzip the infile to a temporary file, replace the 
 // infile with the tmp file path.
@@ -142,6 +145,30 @@ bool inflateGYM(char *infile, char *inflatedFilename, bool verbose)
     return result;
 }
 
+void cleanUp() {
+    if (emu)
+    {
+        gme_delete(emu);
+        emu = 0;
+    }
+    wave_close();
+    if (removeInflateTmpFile)
+    {
+        remove(inflatedFilename_);
+        removeInflateTmpFile = false;
+    }
+
+}
+
+// CTRL-C handler, free mem and delete temp files
+void sighandler(int signum)
+{
+//    printf("Caught signal %d, clean up...\n", signum);
+    cleanUp();
+    exit(1);
+}
+
+
 int main(int argc, char** argv)
 {
     // Command-line arguments
@@ -234,8 +261,6 @@ int main(int argc, char** argv)
     /**
      * Convert vgz into vgm if needed
      */
-    char inflatedFilename[64];
-    bool removeInflateTmpFile = false;
     char *fileExt = strrchr(infile, '.');
     if (fileExt)
     {
@@ -244,7 +269,7 @@ int main(int argc, char** argv)
         // Try ungzipping vgz fils
         if (strcmp(fileExt, ".vgz") == 0)
         {
-            if (unGzip(infile, inflatedFilename, verbose))
+            if (unGzip(infile, inflatedFilename_, verbose))
             {
                 removeInflateTmpFile = true;
             }
@@ -252,14 +277,14 @@ int main(int argc, char** argv)
         // Try deflating GYM files
         else if (strcmp(fileExt, ".gym") == 0)
         {
-            if (inflateGYM(infile, inflatedFilename, verbose))
+            if (inflateGYM(infile, inflatedFilename_, verbose))
             {
                 removeInflateTmpFile = true;
             }
         }
     }
 
-    Music_Emu *emu;
+
     /* Open music file in new emulator */
 	handle_error( gme_open_file( infile, &emu, sample_rate ) );
 	
@@ -282,6 +307,9 @@ int main(int argc, char** argv)
         if (verbose)
             fprintf(stderr, "Track length : %d s\n", t_sec);
     }
+
+    signal(SIGINT, sighandler);
+
     // process each voice if -v is enabled
     for (int vi = 0; vi < num_voices; vi++)
     {
@@ -362,14 +390,8 @@ int main(int argc, char** argv)
         wave_close();
     }
 
-	/* Cleanup */
-	gme_delete( emu );
-	
-    if (removeInflateTmpFile) {
-        remove(inflatedFilename);
-    }
-
-	return 0;
+    cleanUp();
+    return 0;
 }
 
 void handle_error( const char* str )
