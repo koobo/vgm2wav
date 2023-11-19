@@ -87,8 +87,6 @@ ZLIB_SRCA:=zlib/adler32.c \
 	zlib/uncompr.c \
 	zlib/zutil.c 
 
-#.PHONY: zlib.stamp ym2413.stamp
-
 all: zlib.stamp ym2413.stamp $(TARGET)
 
 zlib.stamp:
@@ -101,7 +99,7 @@ ym2413.stamp:
 	touch $@
 
 clean:
-	rm -f $(TARGET) $(TARGET).sym mo_ym2413_emu.zip
+	rm -f $(TARGET) $(TARGET).sym mo_ym2413_emu.zip *.stamp
 
 libgme/gme/Ym2413_Emu.cpp: ym2413.stamp
 
