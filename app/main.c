@@ -308,20 +308,25 @@ int main(int argc, char** argv)
         gme_info_t *tinfo;
         handle_error(gme_track_info(emu, &tinfo, track));
         int tlen = tinfo->play_length;
+
+        // Check for specified length
         if (tinfo->length != -1)
         {
-            // if the length is specified
             t_sec = tinfo->length / 1000;
-            if (verbose)
-                fprintf(stderr, "Track length : %d s\n", t_sec);
+        }
+        // Check for specified play_length (150000 is the default if not spcified)
+        else if (tlen != 150000)
+        {
+            t_sec = tlen / 1000;
         }
         else
         {
-            // if the length is not specified
             if (verbose)
                 fprintf(stderr, "No track length\n");
         }
     }
+    if (verbose)
+        fprintf(stderr, "Track length: %ld\n", t_sec);
 
     // Write it out
     if (lengthFlag)
@@ -332,7 +337,7 @@ int main(int argc, char** argv)
             fwrite(&t_sec, sizeof(t_sec), 1, out);
             fclose(out);
             if (verbose)
-                fprintf(stderr, "Wrote track %ld length into %s\n", t_sec, lengthOutFile);
+                fprintf(stderr, "Wrote track length %lds into %s\n", t_sec, lengthOutFile);
         }
     }
 
@@ -449,17 +454,17 @@ void handle_error( const char* str )
 
 void usage(void)
 {
-    fprintf(stderr, "usage: vgm2wav -i [file] -o [file] [-v] [-r track_num] [-f freq] [-b]\n");
+    fprintf(stderr, "usage: vgm2wav -i [file] -o [file] [-r track_num] [-f freq] [-b]\n");
     fprintf(stderr, "               [-8] [-t secs] [-l file]\n" );
     //fprintf(stderr, "output supports '-' as filename for stdout\n");
     fprintf(stderr, "-i: input file (AY,GBS,GYM,HES,KSS,NSF/NSFE,SAP,SPC,VGM,VGZ)\n");
     fprintf(stderr, "-o: output file (WAV)\n");
-    fprintf(stderr, "-v: all voices into separate WAVs\n");
+    //fprintf(stderr, "-v: all voices into separate WAVs\n");
     fprintf(stderr, "-r: index of track to play (0 is first)\n");
     fprintf(stderr, "-f: output sample frequency (default 44100)\n");
     fprintf(stderr, "-b: verbose output\n");
     fprintf(stderr, "-8: output 8-bit WAV instead of 16-bit WAV\n");
-    fprintf(stderr, "-t: playtime in secs (default 30s or whatever is defined in the file)\n");
+    fprintf(stderr, "-t: playtime in secs (defaults to whatever is defined in the file)\n");
     fprintf(stderr, "-l: write track length in seconds into given file\n");
     exit( EXIT_FAILURE );
 }
