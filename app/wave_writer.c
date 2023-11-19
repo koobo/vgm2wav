@@ -6,6 +6,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
+#include <stdbool.h>
 
 /* Copyright (C) 2003-2007 Shay Green. This module is free software; you
 can redistribute it and/or modify it under the terms of the GNU Lesser
@@ -29,13 +30,13 @@ static long  sample_count_;
 static long  sample_rate_;
 static long  buf_pos;
 static int   chan_count;
-static int   output_8bit;
+static bool  output_8bit;
 
-static void exit_with_error( const char* str )
-{
-	printf( "Error: %s\n", str ); getchar();
-	exit( EXIT_FAILURE );
-}
+//static void exit_with_error( const char* str )
+//{
+//	printf( "Error: %s\n", str ); getchar();
+//	exit( EXIT_FAILURE );
+//}
 
 FILE* wave_open( long sample_rate, const char* filename )
 {
@@ -43,18 +44,22 @@ FILE* wave_open( long sample_rate, const char* filename )
 	sample_rate_  = sample_rate;
 	buf_pos       = header_size;
 	chan_count    = 1;
-    output_8bit   = 0;
+    output_8bit   = false;
 	
 	buf = (unsigned char*) malloc( buf_size * sizeof *buf );
-	if ( !buf )
-		exit_with_error( "Out of memory" );
+	if ( !buf ) {
+        return NULL;
+		//exit_with_error( "Out of memory" );
+    }
 
     if ( strcmp( filename, "-" ) == 0 )
         file = tmpfile();  
     else
 	    file = fopen( filename, "wb" );
-    if ( !file )
-		exit_with_error( "Couldn't open WAVE file for writing" );
+    if ( !file ) {
+        return NULL;
+		//exit_with_error( "Couldn't open WAVE file for writing" );
+    }
 	
 	setvbuf( file, 0, _IOFBF, 32 * 1024L );
 
@@ -68,25 +73,31 @@ void wave_enable_stereo( void )
 
 void wave_set_8bit( void )
 {
-    output_8bit = 1;
+    output_8bit = true;
 }
 
 
-static void flush_()
+static bool flush_()
 {
-	if ( buf_pos && !fwrite( buf, buf_pos, 1, file ) )
-		exit_with_error( "Couldn't write WAVE data" );
+	if ( buf_pos && !fwrite( buf, buf_pos, 1, file ) ) {
+		//exit_with_error( "Couldn't write WAVE data" );
+        return false;
+    }
 	buf_pos = 0;
+    return true;
 }
 
-void wave_write(short const *in, int remain)
+bool wave_write(short const *in, int remain)
 {
     sample_count_ += remain;
 
     while (remain)
     {
-        if (buf_pos >= buf_size)
-            flush_();
+        if (buf_pos >= buf_size) {
+            if (!flush_()) {
+                return false;
+            }
+        }
 
         unsigned char *p = &buf[buf_pos];
         // How many samples fit in the buffer:
@@ -121,6 +132,7 @@ void wave_write(short const *in, int remain)
         buf_pos = p - buf;
         // assert(buf_pos <= buf_size);
     }
+    return true;
 }
 
 long wave_sample_count( void )

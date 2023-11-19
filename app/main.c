@@ -13,8 +13,6 @@
 
 #include "zlib.h"
 
-#define T_SEC_DEFAULT 30
-
 void handle_error( const char* str );
 void usage( void );
 
@@ -137,6 +135,8 @@ bool inflateGYM(char *infile, char *inflatedFilename, bool verbose)
         {
             result = true;
             strcpy(infile, inflatedFilename);
+            if (verbose)
+                fprintf(stderr, "Inflated %ld kB\n", outSize / 1024);
         }
         fclose(output);
     }
@@ -160,10 +160,10 @@ void cleanUp() {
 
 }
 
-// CTRL-C handler, free mem and delete temp files
+// CTRL-C handler
 void sighandler(int signum)
 {
-//    printf("Caught signal %d, clean up...\n", signum);
+    printf("Caught signal %d\n", signum);
     cleanUp();
     exit(1);
 }
@@ -175,9 +175,10 @@ int main(int argc, char** argv)
     int vflag = 0;
     //char *infile = NULL;
     char infile[128];
+    char lengthOutFile[128];
     int iflag = 0;
     int c = 0;
-    int t_sec = 30; // default: 30 seconds of wave
+    int t_sec = -1; 
     int tflag = 0;
     int sel_voice = 0;
     int sflag = 0;
@@ -188,14 +189,15 @@ int main(int argc, char** argv)
     int tr_sel = 0;
     int freq_sel = 0;
     int freqflag = 0;
-    int output8bit = 0;
+    bool output8bit = false;
+    bool lengthFlag = false;
 
     if (argc < 2) 
     {
         usage();
     }
 
-    while ((c = getopt( argc, argv, "vb8t:i:s:o:r:f:")) != -1 )
+    while ((c = getopt( argc, argv, "vb8t:i:s:o:r:f:l:")) != -1 )
         switch (c)
         {
             case 'v': // all voices
@@ -204,6 +206,10 @@ int main(int argc, char** argv)
             case 'i': // input file
               strcpy(infile, optarg);
               iflag = 1;
+              break;
+            case 'l': // length file
+              strcpy(lengthOutFile, optarg);
+              lengthFlag = true;
               break;
             case 't': // change the time
               t_sec = atoi( optarg );
@@ -229,7 +235,7 @@ int main(int argc, char** argv)
               freq_sel = atoi( optarg );
               break;
             case '8':
-              output8bit = 1;
+              output8bit = true;
               break;
             case '?':
               if (optopt == 'i')
@@ -266,7 +272,7 @@ int main(int argc, char** argv)
     {
         for (char *p = fileExt; *p; ++p)
             *p = tolower(*p);
-        // Try ungzipping vgz fils
+        // Try ungzipping vgz files
         if (strcmp(fileExt, ".vgz") == 0)
         {
             if (unGzip(infile, inflatedFilename_, verbose))
@@ -284,28 +290,50 @@ int main(int argc, char** argv)
         }
     }
 
+    if (verbose)
+        fprintf(stderr, "Opening\n");
 
     /* Open music file in new emulator */
 	handle_error( gme_open_file( infile, &emu, sample_rate ) );
 	
     /* Get num voices */
     int num_voices = ( vflag == 1 ) ? gme_voice_count( emu ) : 1;
-    
+
     /* Decide on how long to play.
      * If time specified, play the whole track.
      * If no track length specified, default to 30 seconds.
      */
-    if ( !tflag )
+    if (!tflag)
     {
-        gme_info_t* tinfo;
-        handle_error( gme_track_info( emu, &tinfo, track ) );
+        gme_info_t *tinfo;
+        handle_error(gme_track_info(emu, &tinfo, track));
         int tlen = tinfo->play_length;
-        if ( tinfo->length != -1 ) // if the length is specified
+        if (tinfo->length != -1)
+        {
+            // if the length is specified
             t_sec = tinfo->length / 1000;
-        else // if the length is not specified
-            t_sec = (tlen == 150000) ? T_SEC_DEFAULT : (tlen / 1000);
-        if (verbose)
-            fprintf(stderr, "Track length : %d s\n", t_sec);
+            if (verbose)
+                fprintf(stderr, "Track length : %d s\n", t_sec);
+        }
+        else
+        {
+            // if the length is not specified
+            if (verbose)
+                fprintf(stderr, "No track length\n");
+        }
+    }
+
+    // Write it out
+    if (lengthFlag)
+    {
+        FILE *out = fopen(lengthOutFile, "wb");
+        if (out)
+        {
+            fwrite(&t_sec, sizeof(t_sec), 1, out);
+            fclose(out);
+            if (verbose)
+                fprintf(stderr, "Wrote track %ld length into %s\n", t_sec, lengthOutFile);
+        }
     }
 
     signal(SIGINT, sighandler);
@@ -353,22 +381,36 @@ int main(int argc, char** argv)
         
         /* Begin writing to wave file */
         FILE * curfile = wave_open( sample_rate, fname );
+        if (!curfile) {
+            fprintf(stderr, "Error opening output\n");
+            cleanUp();
+            return EXIT_FAILURE;
+        }
         wave_enable_stereo();
-        if (output8bit) wave_set_8bit();
+        if (output8bit)
+        {
+            wave_set_8bit();
+        }
 
-        /* Record t_sec (default 10) seconds of track */
+        /* Record track as long as specified in the song, command line,
+        or until CTRL+C */
         int done = 0;
-        while ( gme_tell( emu ) < t_sec * 1000L )
+        while ( t_sec < 0 || gme_tell( emu ) < t_sec * 1000L )
         {
             /* Sample buffer */
-            #define BUF_SIZE 1024 /* can be any multiple of 2 */
+            #define BUF_SIZE 1024*2 /* can be any multiple of 2 */
             short buf [BUF_SIZE];
             
             /* Fill sample buffer */
             handle_error( gme_play( emu, BUF_SIZE, buf ) );
             
             /* Write samples to wave file */
-            wave_write( buf, BUF_SIZE );
+            if (!wave_write(buf, BUF_SIZE))
+            {
+                fprintf(stderr, "Error writing output\n");
+                cleanUp();
+                return EXIT_FAILURE;
+            }
         }
 
         /* Done writing voice to wave, write header */
@@ -391,22 +433,25 @@ int main(int argc, char** argv)
     }
 
     cleanUp();
-    return 0;
+    return EXIT_SUCCESS;
 }
 
 void handle_error( const char* str )
 {
 	if ( str )
 	{
-		fprintf(stderr, "Error: %s\n", str ); getchar();
+		fprintf(stderr, "Error: %s\n", str ); 
+        //getchar();
+        cleanUp();
 		exit( EXIT_FAILURE );
 	}
 }
 
 void usage(void)
 {
-    fprintf(stderr, "usage: vgm2wav -i [file] -o [file] [-v] [-r track_num] [-f freq] [-b] [-8] [-t secs]\n" );
-    fprintf(stderr, "output supports '-' as filename for stdout\n");
+    fprintf(stderr, "usage: vgm2wav -i [file] -o [file] [-v] [-r track_num] [-f freq] [-b]\n");
+    fprintf(stderr, "               [-8] [-t secs] [-l file]\n" );
+    //fprintf(stderr, "output supports '-' as filename for stdout\n");
     fprintf(stderr, "-i: input file (AY,GBS,GYM,HES,KSS,NSF/NSFE,SAP,SPC,VGM,VGZ)\n");
     fprintf(stderr, "-o: output file (WAV)\n");
     fprintf(stderr, "-v: all voices into separate WAVs\n");
@@ -415,5 +460,6 @@ void usage(void)
     fprintf(stderr, "-b: verbose output\n");
     fprintf(stderr, "-8: output 8-bit WAV instead of 16-bit WAV\n");
     fprintf(stderr, "-t: playtime in secs (default 30s or whatever is defined in the file)\n");
+    fprintf(stderr, "-l: write track length in seconds into given file\n");
     exit( EXIT_FAILURE );
 }

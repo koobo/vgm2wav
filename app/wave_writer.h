@@ -10,7 +10,7 @@
 
 FILE * wave_open( long sample_rate, const char* filename );
 void wave_enable_stereo( void );
-void wave_write( short const* in, int count );
+bool wave_write( short const* in, int count );
 long wave_sample_count( void );
 void wave_write_header( void );
 void wave_close( void );
