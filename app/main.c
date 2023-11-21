@@ -68,7 +68,7 @@ bool unGzip(char* infile, char* inflatedFilename, bool verbose)
 }
 
 
-// Deflate the GYM infile to a temporary file, replace the 
+// Inflate the GYM infile to a temporary file, replace the 
 // infile with the tmp file path.
 bool inflateGYM(char *infile, char *inflatedFilename, bool verbose)
 {
@@ -280,7 +280,7 @@ int main(int argc, char** argv)
                 removeInflateTmpFile = true;
             }
         }
-        // Try deflating GYM files
+        // Try inflating GYM files
         else if (strcmp(fileExt, ".gym") == 0)
         {
             if (inflateGYM(infile, inflatedFilename_, verbose))
