@@ -31,7 +31,7 @@ bool unGzip(char* infile, char* inflatedFilename, bool verbose)
     gzFile gz = gzopen(infile, "rb");
     if (!gz)
     {
-        fprintf(stderr, "Can't open gzip file : %s\n", infile);
+        fprintf(stderr, "Can't open gzip file: %s\n", infile);
         return false;
     }
     else
@@ -255,14 +255,14 @@ int main(int argc, char** argv)
     if (freqflag)
         sample_rate = freq_sel;
     if (verbose)
-        fprintf(stderr, "Sample rate : %ld\n", sample_rate);
+        fprintf(stderr, "Sample rate: %ld\n", sample_rate);
 
 	int track = ( trflag == 1 ) ? tr_sel : 0; /* index of track to play (0 = first) */
 	
     if (!iflag)
         sprintf(infile, "test.nsf");
     if (verbose)
-        fprintf(stderr, "Input file : %s\n", infile);
+        fprintf(stderr, "Input file: %s\n", infile);
 
     /**
      * Convert vgz into vgm if needed
@@ -291,7 +291,7 @@ int main(int argc, char** argv)
     }
 
     if (verbose)
-        fprintf(stderr, "Opening\n");
+        fprintf(stderr, "Opening: %s\n", infile);
 
     /* Open music file in new emulator */
 	handle_error( gme_open_file( infile, &emu, sample_rate ) );
@@ -326,7 +326,7 @@ int main(int argc, char** argv)
         }
     }
     if (verbose)
-        fprintf(stderr, "Track length: %ld\n", t_sec);
+        fprintf(stderr, "Track length: %ld s\n", t_sec);
 
     // Write it out
     if (lengthFlag)
@@ -382,7 +382,7 @@ int main(int argc, char** argv)
         }
 
         if (verbose)
-            fprintf(stderr, "Output file : %s\n", fname);
+            fprintf(stderr, "Output file: %s\n", fname);
         
         /* Begin writing to wave file */
         FILE * curfile = wave_open( sample_rate, fname );
@@ -466,6 +466,6 @@ void usage(void)
     fprintf(stderr, "-b: verbose output\n");
     fprintf(stderr, "-8: output 8-bit WAV instead of 16-bit WAV\n");
     fprintf(stderr, "-t: playtime in secs (defaults to whatever is defined in the file)\n");
-    fprintf(stderr, "-l: write track length in seconds into given file\n");
+    fprintf(stderr, "-l: write track length in seconds into the given file\n");
     exit( EXIT_FAILURE );
 }
