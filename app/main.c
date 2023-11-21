@@ -454,6 +454,7 @@ void handle_error( const char* str )
 
 void usage(void)
 {
+    fprintf(stderr, "vgm2wav (November 2023)\n");
     fprintf(stderr, "usage: vgm2wav -i [file] -o [file] [-r track_num] [-f freq] [-b]\n");
     fprintf(stderr, "               [-8] [-t secs] [-l file]\n" );
     //fprintf(stderr, "output supports '-' as filename for stdout\n");
