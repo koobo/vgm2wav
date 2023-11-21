@@ -1,14 +1,20 @@
+Short: Convert console music files into WAV
+Author: kpk@iki.fi (K-P Koljonen)
+Uploader: kpk@iki.fi (K-P Koljonen)
+Type: mus/misc
+Version: 1.0
+Architecture: m68k-amigaos >= 2.0
+
+vgm2wav converts video game music files to uncompressed WAV format. 
+The conversion is achieved by running a sound emulator and converting 
+the raw resulting stream to an audio file. 
+
 This is an Amiga port of the commandline tool 
 "vgm2wav" (https://github.com/weinerjm/vgm2wav)
 by Joshua Weiner.
 
 It uses the Game Music Emulator library libgme by Shay Green 
 (https://github.com/mcfiredrill/libgme/) for sound output.
-
-vgm2wav converts video game music files to uncompressed WAV format. 
-The conversion is achieved by running a sound emulator and converting 
-the raw resulting stream to an audio file. The output can be to either 
-a file or a stream (stdout).
 
 Supported formats:
 AY        ZX Spectrum/Amstrad CPC
@@ -21,8 +27,10 @@ SAP       Atari systems using POKEY sound chip
 SPC       Super Nintendo/Super Famicom
 VGM/VGZ   Sega Master System/Mark III, Sega Genesis/Mega Drive,BBC Micro
 
-Use a large stack, 50000 seems to work.
-
-Improvements compared to the original:
+Some improvements compared to the original:
 - Support for VGZ files (gzipped VGM).
 - Support for compressed GYM files.
+
+Selct a suitable version for your CPU.
+Use a large stack, 50000 seems to work.
+
