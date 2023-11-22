@@ -1,5 +1,5 @@
-Short: Convert console music files into WAV
-Author: kpk@iki.fi (K-P Koljonen)
+Short: Convert console music files to WAV
+Author: S. Green, J. Weiner, K-P Koljonen
 Uploader: kpk@iki.fi (K-P Koljonen)
 Type: mus/misc
 Version: 1.0
@@ -31,6 +31,9 @@ Some improvements compared to the original:
 - Support for VGZ files (gzipped VGM).
 - Support for compressed GYM files.
 
-Selct a suitable version for your CPU.
-Use a large stack, 50000 seems to work.
+libgme is not able to play everything correcly. On the other hand it's
+relatively fast which is a good thing when running on an Amiga.
 
+Select a suitable version for your CPU. Use a large stack, 50000 seems to work.
+
+Amiga port and some improvements by K-P in November 2023.
