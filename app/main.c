@@ -296,6 +296,9 @@ int main(int argc, char** argv)
     /* Open music file in new emulator */
 	handle_error( gme_open_file( infile, &emu, sample_rate ) );
 	
+    if (verbose)
+        fprintf(stderr, "Track count: %ld\n", gme_track_count(emu));
+
     /* Get num voices */
     int num_voices = ( vflag == 1 ) ? gme_voice_count( emu ) : 1;
 
@@ -335,9 +338,12 @@ int main(int argc, char** argv)
         if (out)
         {
             fwrite(&t_sec, sizeof(t_sec), 1, out);
+            int count = gme_track_count(emu);
+            fwrite(&count, sizeof(count), 1, out);
             fclose(out);
             if (verbose)
-                fprintf(stderr, "Wrote track length %lds into %s\n", t_sec, lengthOutFile);
+                fprintf(stderr, "Wrote track length %lds, track count %ld into %s\n",
+                        t_sec, count, lengthOutFile);
         }
     }
 
@@ -466,6 +472,6 @@ void usage(void)
     fprintf(stderr, "-b: verbose output\n");
     fprintf(stderr, "-8: output 8-bit WAV instead of 16-bit WAV\n");
     fprintf(stderr, "-t: playtime in secs (defaults to whatever is defined in the file)\n");
-    fprintf(stderr, "-l: write track length in seconds into the given file\n");
+    fprintf(stderr, "-l: write track length in seconds and track count in the given file\n");
     exit( EXIT_FAILURE );
 }
