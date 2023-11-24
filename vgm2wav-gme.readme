@@ -34,6 +34,7 @@ Some improvements compared to the original:
 libgme is not able to play everything correcly. On the other hand it's
 relatively fast which is a good thing when running on an Amiga.
 
-Select a suitable version for your CPU. Use a large stack, 50000 seems to work.
+Select a suitable version for your CPU. Use a large stack, 10000 seems to work.
 
 Amiga port and some improvements by K-P in November 2023.
+
