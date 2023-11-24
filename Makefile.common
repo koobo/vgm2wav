@@ -5,7 +5,7 @@ GCC ?= $(VBCC)/bin/m68k-amigaos-gcc
 GPP ?= $(VBCC)/bin/m68k-amigaos-g++
 STRIP ?= $(VBCC)/bin/m68k-amigaos-strip
 OBJCOPY ?= $(VBCC)/bin/m68k-amigaos-objcopy
-CFLAGS :=  $(CPUOPT) -Wstack-usage=4096 -Wno-deprecated -O2 -fno-exceptions -fno-rtti -noixemul -fomit-frame-pointer -Ilibgme -DBLARGG_BIG_ENDIAN -DBLIP_BUFFER_FAST -Izlib
+CFLAGS :=  $(CPUOPT) -Wstack-usage=3000 -fstack-usage -Wno-deprecated -O2 -fno-exceptions -fno-rtti -noixemul -fomit-frame-pointer -Ilibgme -DBLARGG_BIG_ENDIAN -DBLIP_BUFFER_FAST -Izlib
 
 SRC := app/main.c \
 	app/wave_writer.c \

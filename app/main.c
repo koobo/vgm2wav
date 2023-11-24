@@ -24,6 +24,11 @@ Music_Emu *emu = 0;
 char inflatedFilename_[64];
 bool removeInflateTmpFile = false;
 
+/* Sample buffer */
+const int BUF_SIZE = 1024 * 2; /* can be any multiple of 2 */
+short buf[BUF_SIZE];
+
+
 // Ungzip the infile to a temporary file, replace the 
 // infile with the tmp file path.
 bool unGzip(char* infile, char* inflatedFilename, bool verbose)
@@ -460,9 +465,6 @@ trackLoop:
             }
         }
 
-        /* Sample buffer */
-        const int BUF_SIZE = 1024 * 2; /* can be any multiple of 2 */
-        short buf[BUF_SIZE];
 
         /* Fill sample buffer */
         handle_error(gme_play(emu, BUF_SIZE, buf));
