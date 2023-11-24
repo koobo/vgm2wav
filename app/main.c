@@ -10,6 +10,7 @@
 #include <libgen.h>
 #include <ctype.h>
 #include <signal.h>
+#include <time.h>
 
 #include <proto/exec.h>
 
@@ -415,6 +416,7 @@ trackLoop:
     /* Start track */
     if (verbose)
         fprintf(stderr, "Start track: %ld\n", track);
+        
     handle_error(gme_start_track(emu, track));
 
     //        char fname[80];
@@ -432,6 +434,9 @@ trackLoop:
 
     /* Record track as long as specified in the song, command line,
     or until CTRL+C */
+    int position = gme_tell(emu)/1000;
+    int written = 0;
+    time_t startTime = time(NULL);
     while (t_sec < 0 || gme_tell(emu) < t_sec * 1000L)
     {
         if (SetSignal(0L, SIGBREAKF_CTRL_D) & SIGBREAKF_CTRL_D)
@@ -476,7 +481,24 @@ trackLoop:
             break;
         }
 
-     
+        if (verbose)
+        {
+            written += BUF_SIZE;
+            const int newPos = gme_tell(emu) / 1000;
+            if (newPos > position + 1)
+            {
+
+                position = newPos;
+                const int elapsed = time(NULL) - startTime;
+                if (elapsed > 0)
+                {
+                    fprintf(stderr, "%lds, %ldkB, %.2f\n",
+                            position,
+                            written >> 10,
+                            (double)newPos / (double)elapsed);
+                }
+            }
+        }
     }
 
     /* Done writing voice to wave, write header */
@@ -516,7 +538,7 @@ void handle_error( const char* str )
 void usage(void)
 {
     fprintf(stderr, "vgm2wav (November 2023)\n");
-    fprintf(stderr, "usage: vgm2wav -i [file] -o [file] [-r track_num] [-f freq] [-b]\n");
+    fprintf(stderr, "usage: vgm2wav -i [file] -o [file] [-r track_num] [-f freq] [-v]\n");
     fprintf(stderr, "               [-8] [-t secs] [-l file]\n" );
     //fprintf(stderr, "output supports '-' as filename for stdout\n");
     fprintf(stderr, "-i: input file (AY,GBS,GYM,HES,KSS,NSF/NSFE,SAP,SPC,VGM,VGZ)\n");
