@@ -15,6 +15,7 @@ long wave_sample_count( void );
 void wave_write_header( void );
 void wave_close( void );
 void wave_set_8bit(void);
+void wave_disable_header(void);
 
 #ifdef __cplusplus
 	}

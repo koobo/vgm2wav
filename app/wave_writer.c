@@ -31,6 +31,7 @@ static long  sample_rate_;
 static long  buf_pos;
 static int   chan_count;
 static bool  output_8bit;
+static bool  disable_header;
 
 //static void exit_with_error( const char* str )
 //{
@@ -76,6 +77,10 @@ void wave_set_8bit( void )
     output_8bit = true;
 }
 
+void wave_disable_header( void )
+{
+    disable_header = true;
+}
 
 static bool flush_()
 {
@@ -150,6 +155,8 @@ static void set_le32( void* p, unsigned long n )
 
 void wave_write_header( void )
 {
+    if (disable_header) return;
+
 	if ( file )
 	{
         unsigned char bits_per_sample = output_8bit ? 8 : 16;

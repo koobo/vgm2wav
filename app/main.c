@@ -11,6 +11,8 @@
 #include <ctype.h>
 #include <signal.h>
 
+#include <proto/exec.h>
+
 #include "zlib.h"
 
 void handle_error( const char* str );
@@ -151,6 +153,7 @@ void cleanUp() {
         gme_delete(emu);
         emu = 0;
     }
+    wave_write_header();
     wave_close();
     if (removeInflateTmpFile)
     {
@@ -191,18 +194,19 @@ int main(int argc, char** argv)
     int freqflag = 0;
     bool output8bit = false;
     bool lengthFlag = false;
+    bool noWavHeader = false;
 
     if (argc < 2) 
     {
         usage();
     }
 
-    while ((c = getopt( argc, argv, "vb8t:i:s:o:r:f:l:")) != -1 )
+    while ((c = getopt( argc, argv, "vnb8t:i:o:r:f:l:")) != -1 )
         switch (c)
         {
-            case 'v': // all voices
-              vflag = 1;
-              break;
+//            case 'v': // all voices
+//              vflag = 1;
+//              break;
             case 'i': // input file
               strcpy(infile, optarg);
               iflag = 1;
@@ -215,16 +219,20 @@ int main(int argc, char** argv)
               t_sec = atoi( optarg );
               tflag = 1;
               break;
-            case 's': // single voice
-              sel_voice = atoi( optarg );
-              sflag = 1;
-              break;
+//            case 's': // single voice
+//              sel_voice = atoi( optarg );
+//              sflag = 1;
+//              break;
             case 'o':
               outfile = optarg;
               oflag = 1;
               break;
+            case 'v': 
             case 'b':
               verbose = 1;
+              break;
+            case 'n':
+              noWavHeader = true;
               break;
             case 'r':
               trflag = 1;
@@ -250,7 +258,12 @@ int main(int argc, char** argv)
             default:
               abort();
         }
-	
+
+    if (!iflag)
+        usage();
+    if (!oflag)
+        usage();
+
     unsigned int sample_rate = 44100; /* number of samples per second */
     if (freqflag)
         sample_rate = freq_sel;
@@ -259,8 +272,6 @@ int main(int argc, char** argv)
 
 	int track = ( trflag == 1 ) ? tr_sel : 0; /* index of track to play (0 = first) */
 	
-    if (!iflag)
-        sprintf(infile, "test.nsf");
     if (verbose)
         fprintf(stderr, "Input file: %s\n", infile);
 
@@ -300,7 +311,37 @@ int main(int argc, char** argv)
         fprintf(stderr, "Track count: %ld\n", gme_track_count(emu));
 
     /* Get num voices */
-    int num_voices = ( vflag == 1 ) ? gme_voice_count( emu ) : 1;
+    if (verbose)
+        fprintf(stderr, "Voices: %ld\n", gme_voice_count( emu ));
+
+    if (verbose)
+        fprintf(stderr, "Output file: %s\n", outfile);
+
+
+    /* Begin writing to wave file */
+    FILE *curfile = wave_open(sample_rate, outfile);
+    if (!curfile)
+    {
+        fprintf(stderr, "Error opening output\n");
+        cleanUp();
+        return EXIT_FAILURE;
+    }
+    wave_enable_stereo();
+    if (output8bit)
+    {
+        wave_set_8bit();
+    }
+    if (noWavHeader) {
+        wave_disable_header();
+    }
+
+    signal(SIGINT, sighandler);
+
+    const int trackCount = gme_track_count(emu);
+
+trackLoop:
+    if (verbose)
+        fprintf(stderr, "Track: %ld\n", track);
 
     /* Decide on how long to play.
      * If time specified, play the whole track.
@@ -340,108 +381,122 @@ int main(int argc, char** argv)
             fwrite(&t_sec, sizeof(t_sec), 1, out);
             int count = gme_track_count(emu);
             fwrite(&count, sizeof(count), 1, out);
+            int voices = gme_voice_count(emu);
+            fwrite(&voices, sizeof(count), 1, out);
             fclose(out);
             if (verbose)
-                fprintf(stderr, "Wrote track length %lds, track count %ld into %s\n",
-                        t_sec, count, lengthOutFile);
+                fprintf(stderr, "Wrote track length %lds, track count %ld, voices %ld into %s\n",
+                        t_sec, count, voices, lengthOutFile);
         }
     }
 
-    signal(SIGINT, sighandler);
-
     // process each voice if -v is enabled
-    for (int vi = 0; vi < num_voices; vi++)
+    //    for (int vi = 0; vi < num_voices; vi++)
+    //    {
+
+    //        // unsilence tracks. 1 means mute
+    //        #define ALL_VOICES -1
+    //        if ( sflag == 1 )
+    //        {
+    //            gme_mute_voices( emu, ALL_VOICES );
+    //            gme_mute_voice( emu, sel_voice, 0 );
+    //            if (verbose)
+    //                fprintf(stderr, "Unmuted voice %d\n", sel_voice);
+    //        }
+    //        else if ( vflag == 1 )
+    //        {
+    //            // unmute only the currently processed voice
+    //            gme_mute_voices( emu, ALL_VOICES );
+    //            gme_mute_voice( emu, vi, 0 );
+    //            if (verbose)
+    //                fprintf(stderr, "Unmuted voice %d\n", vi);
+    //        }
+
+    /* Start track */
+    if (verbose)
+        fprintf(stderr, "Start track: %ld\n", track);
+    handle_error(gme_start_track(emu, track));
+
+    //        char fname[80];
+    //        if ( vflag == 1 )
+    //            sprintf( fname, "Voice%d.wav", vi );
+    //        else if ( oflag == 1 )
+    //            strcpy( fname, outfile );
+    //        else // no output set
+    //        {
+    //            if ( sflag == 1)
+    //                sprintf( fname, "Voice%d.wav", sel_voice);
+    //            else // default
+    //                sprintf( fname, "out.wav" );
+    //        }
+
+    /* Record track as long as specified in the song, command line,
+    or until CTRL+C */
+    while (t_sec < 0 || gme_tell(emu) < t_sec * 1000L)
     {
-        
-        // unsilence tracks. 1 means mute
-        #define ALL_VOICES -1
-        if ( sflag == 1 ) 
+        if (SetSignal(0L, SIGBREAKF_CTRL_D) & SIGBREAKF_CTRL_D)
         {
-            gme_mute_voices( emu, ALL_VOICES );
-            gme_mute_voice( emu, sel_voice, 0 ); 
-            if (verbose)
-                fprintf(stderr, "Unmuted voice %d\n", sel_voice);
+            if (track < trackCount)
+            {
+                track++;
+                if (verbose)
+                    fprintf(stderr, "Next track %ld/%ld\n", track, trackCount);
+                goto trackLoop;
+            }
         }
-        else if ( vflag == 1 ) 
+        if (SetSignal(0L, SIGBREAKF_CTRL_E) & SIGBREAKF_CTRL_E)
         {
-            // unmute only the currently processed voice
-            gme_mute_voices( emu, ALL_VOICES );
-            gme_mute_voice( emu, vi, 0 );
-            if (verbose)
-                fprintf(stderr, "Unmuted voice %d\n", vi);
-        }
-
-        /* Start track */
-        handle_error( gme_start_track( emu, track ) );
-        
-        char fname[80];
-        if ( vflag == 1 )
-            sprintf( fname, "Voice%d.wav", vi );
-        else if ( oflag == 1 )
-            strcpy( fname, outfile );
-        else // no output set
-        {
-            if ( sflag == 1)
-                sprintf( fname, "Voice%d.wav", sel_voice);
-            else // default    
-                sprintf( fname, "out.wav" );
+            if (track > 0)
+            {
+                track--;
+                if (verbose)
+                    fprintf(stderr, "Previous track %ld/%ld\n", track, trackCount);
+                goto trackLoop;
+            }
         }
 
-        if (verbose)
-            fprintf(stderr, "Output file: %s\n", fname);
-        
-        /* Begin writing to wave file */
-        FILE * curfile = wave_open( sample_rate, fname );
-        if (!curfile) {
-            fprintf(stderr, "Error opening output\n");
+        /* Sample buffer */
+        const int BUF_SIZE = 1024 * 2; /* can be any multiple of 2 */
+        short buf[BUF_SIZE];
+
+        /* Fill sample buffer */
+        handle_error(gme_play(emu, BUF_SIZE, buf));
+
+        /* Write samples to wave file */
+        if (!wave_write(buf, BUF_SIZE))
+        {
+            fprintf(stderr, "Error writing output\n");
             cleanUp();
             return EXIT_FAILURE;
         }
-        wave_enable_stereo();
-        if (output8bit)
+
+        if (gme_track_ended(emu))
         {
-            wave_set_8bit();
+            fprintf(stderr, "Track ended\n");
+            break;
         }
 
-        /* Record track as long as specified in the song, command line,
-        or until CTRL+C */
-        int done = 0;
-        while ( t_sec < 0 || gme_tell( emu ) < t_sec * 1000L )
-        {
-            /* Sample buffer */
-            #define BUF_SIZE 1024*2 /* can be any multiple of 2 */
-            short buf [BUF_SIZE];
-            
-            /* Fill sample buffer */
-            handle_error( gme_play( emu, BUF_SIZE, buf ) );
-            
-            /* Write samples to wave file */
-            if (!wave_write(buf, BUF_SIZE))
-            {
-                fprintf(stderr, "Error writing output\n");
-                cleanUp();
-                return EXIT_FAILURE;
-            }
-        }
-
-        /* Done writing voice to wave, write header */
-        wave_write_header();
-        /* Output temp file to stdout if -o - */ 
-        if (strcmp (fname, "-" ) == 0)
-        {
-            errno = 0;
-            rewind(curfile);
-            if (!errno)
-            {
-                size_t buflen;
-                char buf[2048];
-                while ((buflen = fread(buf, 1, sizeof buf, curfile)) > 0)
-                    fwrite(buf, 1, buflen, stdout);
-            }
-        }
-        /* now close the file */
-        wave_close();
+     
     }
+
+    /* Done writing voice to wave, write header */
+    //wave_write_header();
+    //        /* Output temp file to stdout if -o - */
+    //        if (strcmp (fname, "-" ) == 0)
+    //        {
+    //            errno = 0;
+    //            rewind(curfile);
+    //            if (!errno)
+    //            {
+    //                size_t buflen;
+    //                char buf[2048];
+    //                while ((buflen = fread(buf, 1, sizeof buf, curfile)) > 0)
+    //                    fwrite(buf, 1, buflen, stdout);
+    //            }
+    //        }
+    /* now close the file */
+    //wave_close();
+    //    }
 
     cleanUp();
     return EXIT_SUCCESS;
@@ -469,8 +524,9 @@ void usage(void)
     //fprintf(stderr, "-v: all voices into separate WAVs\n");
     fprintf(stderr, "-r: index of track to play (0 is first)\n");
     fprintf(stderr, "-f: output sample frequency (default 44100)\n");
-    fprintf(stderr, "-b: verbose output\n");
+    fprintf(stderr, "-v: verbose output\n");
     fprintf(stderr, "-8: output 8-bit WAV instead of 16-bit WAV\n");
+    fprintf(stderr, "-n: Do not write WAV header\n");
     fprintf(stderr, "-t: playtime in secs (defaults to whatever is defined in the file)\n");
     fprintf(stderr, "-l: write track length in seconds and track count in the given file\n");
     exit( EXIT_FAILURE );
