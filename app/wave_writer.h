@@ -8,7 +8,7 @@
 #endif
 #include <stdio.h>
 
-FILE * wave_open( long sample_rate, const char* filename );
+bool wave_open( long sample_rate, const char* filename );
 void wave_enable_stereo( void );
 bool wave_write( short const* in, int count );
 long wave_sample_count( void );

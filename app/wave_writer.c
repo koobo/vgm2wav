@@ -24,8 +24,8 @@ enum { header_size = 0x2C };
 
 typedef short sample_t;
 
-static unsigned char* buf;
-static FILE* file;
+static unsigned char* buf = 0;
+static FILE* file = 0;
 static long  sample_count_;
 static long  sample_rate_;
 static long  buf_pos;
@@ -39,7 +39,7 @@ static bool  disable_header;
 //	exit( EXIT_FAILURE );
 //}
 
-FILE* wave_open( long sample_rate, const char* filename )
+bool wave_open( long sample_rate, const char* filename )
 {
 	sample_count_ = 0;
 	sample_rate_  = sample_rate;
@@ -53,18 +53,13 @@ FILE* wave_open( long sample_rate, const char* filename )
 		//exit_with_error( "Out of memory" );
     }
 
-    if ( strcmp( filename, "-" ) == 0 )
-        file = tmpfile();  
-    else
-	    file = fopen( filename, "wb" );
+    file = fopen( filename, "wb" );
     if ( !file ) {
-        return NULL;
+        return false;
 		//exit_with_error( "Couldn't open WAVE file for writing" );
     }
 	
-	setvbuf( file, 0, _IOFBF, 32 * 1024L );
-
-    return file;
+    return true;
 }
 
 void wave_enable_stereo( void )

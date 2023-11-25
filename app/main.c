@@ -23,6 +23,7 @@ void usage( void );
 Music_Emu *emu = 0;
 char inflatedFilename_[64];
 bool removeInflateTmpFile = false;
+FILE *curfile = NULL;
 
 /* Sample buffer */
 const int BUF_SIZE = 1024 * 2; /* can be any multiple of 2 */
@@ -159,6 +160,10 @@ void cleanUp() {
         gme_delete(emu);
         emu = 0;
     }
+    if (curfile) {
+        fclose(curfile);
+        curfile = NULL;
+    }
     wave_write_header();
     wave_close();
     if (removeInflateTmpFile)
@@ -166,7 +171,6 @@ void cleanUp() {
         remove(inflatedFilename_);
         removeInflateTmpFile = false;
     }
-
 }
 
 // CTRL-C handler
@@ -192,7 +196,7 @@ int main(int argc, char** argv)
     int sel_voice = 0;
     int sflag = 0;
     int oflag = 0;
-    int verbose = 0;
+    bool verbose = false;
     char *outfile = NULL;
     int trflag = 0;
     int tr_sel = 0;
@@ -201,13 +205,14 @@ int main(int argc, char** argv)
     bool output8bit = false;
     bool lengthFlag = false;
     bool noWavHeader = false;
+    bool outputPcm = false;
 
     if (argc < 2) 
     {
         usage();
     }
 
-    while ((c = getopt( argc, argv, "vnb8t:i:o:r:f:l:")) != -1 )
+    while ((c = getopt( argc, argv, "vp8t:i:o:r:f:l:")) != -1 )
         switch (c)
         {
 //            case 'v': // all voices
@@ -234,12 +239,14 @@ int main(int argc, char** argv)
               oflag = 1;
               break;
             case 'v': 
-            case 'b':
-              verbose = 1;
+              verbose = true;
               break;
-            case 'n':
-              noWavHeader = true;
+            case 'p': 
+              outputPcm = true;
               break;
+//            case 'n':
+//              noWavHeader = true;
+//              break;
             case 'r':
               trflag = 1;
               tr_sel = atoi( optarg );
@@ -323,22 +330,38 @@ int main(int argc, char** argv)
     if (verbose)
         fprintf(stderr, "Output file: %s\n", outfile);
 
-
     /* Begin writing to wave file */
-    FILE *curfile = wave_open(sample_rate, outfile);
-    if (!curfile)
+    if (outputPcm)
     {
-        fprintf(stderr, "Error opening output\n");
-        cleanUp();
-        return EXIT_FAILURE;
+        curfile = fopen(outfile, "wb");
+        if (!curfile)
+        {
+            fprintf(stderr, "Error opening output\n");
+            cleanUp();
+            return EXIT_FAILURE;
+        }
     }
-    wave_enable_stereo();
-    if (output8bit)
+    else
     {
-        wave_set_8bit();
+        if (!wave_open(sample_rate, outfile))
+        {
+            fprintf(stderr, "Error opening output\n");
+            cleanUp();
+            return EXIT_FAILURE;
+        }
     }
-    if (noWavHeader) {
-        wave_disable_header();
+
+    if (!outputPcm)
+    {
+        wave_enable_stereo();
+        if (output8bit)
+        {
+            wave_set_8bit();
+        }
+        if (noWavHeader)
+        {
+            wave_disable_header();
+        }
     }
 
     signal(SIGINT, sighandler);
@@ -469,12 +492,24 @@ trackLoop:
         /* Fill sample buffer */
         handle_error(gme_play(emu, BUF_SIZE, buf));
 
-        /* Write samples to wave file */
-        if (!wave_write(buf, BUF_SIZE))
+        if (outputPcm)
         {
-            fprintf(stderr, "Error writing output\n");
-            cleanUp();
-            return EXIT_FAILURE;
+            if (!fwrite(buf, sizeof(short), BUF_SIZE, curfile))
+            {
+                fprintf(stderr, "Error writing output\n");
+                cleanUp();
+                return EXIT_FAILURE;
+            }
+        }
+        else
+        {
+            /* Write samples to wave file */
+            if (!wave_write(buf, BUF_SIZE))
+            {
+                fprintf(stderr, "Error writing output\n");
+                cleanUp();
+                return EXIT_FAILURE;
+            }
         }
 
         if (gme_track_ended(emu))
@@ -541,7 +576,7 @@ void usage(void)
 {
     fprintf(stderr, "vgm2wav (November 2023)\n");
     fprintf(stderr, "usage: vgm2wav -i [file] -o [file] [-r track_num] [-f freq] [-v]\n");
-    fprintf(stderr, "               [-8] [-t secs] [-l file]\n" );
+    fprintf(stderr, "               [-8] [-p] [-t secs] [-l file]\n" );
     //fprintf(stderr, "output supports '-' as filename for stdout\n");
     fprintf(stderr, "-i: input file (AY,GBS,GYM,HES,KSS,NSF/NSFE,SAP,SPC,VGM,VGZ)\n");
     fprintf(stderr, "-o: output file (WAV)\n");
@@ -550,7 +585,8 @@ void usage(void)
     fprintf(stderr, "-f: output sample frequency (default 44100)\n");
     fprintf(stderr, "-v: verbose output\n");
     fprintf(stderr, "-8: output 8-bit WAV instead of 16-bit WAV\n");
-    fprintf(stderr, "-n: Do not write WAV header\n");
+    //fprintf(stderr, "-n: Do not write WAV header\n");
+    fprintf(stderr, "-p: Output 16-bit stereo PCM instead of WAV\n");
     fprintf(stderr, "-t: playtime in secs (defaults to whatever is defined in the file)\n");
     fprintf(stderr, "-l: write track length in seconds and track count in the given file\n");
     exit( EXIT_FAILURE );
