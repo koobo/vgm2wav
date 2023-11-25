@@ -11,8 +11,10 @@
 #include <ctype.h>
 #include <signal.h>
 #include <time.h>
+#include <fcntl.h>
 
 #include <proto/exec.h>
+#include <proto/dos.h>
 
 #include "zlib.h"
 
@@ -24,9 +26,10 @@ Music_Emu *emu = 0;
 char inflatedFilename_[64];
 bool removeInflateTmpFile = false;
 FILE *curfile = NULL;
+int curfile_ = 0;
 
 /* Sample buffer */
-const int BUF_SIZE = 1024 * 2; /* can be any multiple of 2 */
+const int BUF_SIZE = 1024 * 8; /* can be any multiple of 2 */
 short buf[BUF_SIZE];
 
 
@@ -163,6 +166,10 @@ void cleanUp() {
     if (curfile) {
         fclose(curfile);
         curfile = NULL;
+    }
+    if (curfile_) {
+        close(curfile_);
+        curfile_ = 0;
     }
     wave_write_header();
     wave_close();
@@ -333,8 +340,8 @@ int main(int argc, char** argv)
     /* Begin writing to wave file */
     if (outputPcm)
     {
-        curfile = fopen(outfile, "wb");
-        if (!curfile)
+        curfile_ = open(outfile, O_WRONLY|O_CREAT);
+        if (!curfile_)
         {
             fprintf(stderr, "Error opening output\n");
             cleanUp();
@@ -494,7 +501,8 @@ trackLoop:
 
         if (outputPcm)
         {
-            if (!fwrite(buf, sizeof(short), BUF_SIZE, curfile))
+            //if (!fwrite(buf, sizeof(short), BUF_SIZE, curfile))
+            if (write(curfile_, buf, BUF_SIZE * sizeof(short) == -1))
             {
                 fprintf(stderr, "Error writing output\n");
                 cleanUp();
