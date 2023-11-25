@@ -14,3 +14,9 @@ gme/*.swp
 build/*
 libgme/*
 _deps/
+*.artifacts/
+vgm2wav.*
+*.lha
+.DS_Store
+*.stamp
+*.zip

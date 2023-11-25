@@ -5,7 +5,9 @@ GCC ?= $(VBCC)/bin/m68k-amigaos-gcc
 GPP ?= $(VBCC)/bin/m68k-amigaos-g++
 STRIP ?= $(VBCC)/bin/m68k-amigaos-strip
 OBJCOPY ?= $(VBCC)/bin/m68k-amigaos-objcopy
-CFLAGS :=  $(CPUOPT) -Wstack-usage=3000 -fstack-usage -Wno-deprecated -O2 -fno-exceptions -fno-rtti -noixemul -fomit-frame-pointer -Ilibgme -DBLARGG_BIG_ENDIAN -DBLIP_BUFFER_FAST -Izlib
+CFLAGS :=  $(CPUOPT) -Wstack-usage=3000 -Wno-deprecated -O2 -fno-exceptions -fno-rtti -noixemul -fomit-frame-pointer -Ilibgme -DBLARGG_BIG_ENDIAN -DBLIP_BUFFER_FAST -Izlib -MMD
+
+OUTDIR=$(TARGET).artifacts
 
 SRC := app/main.c \
 	app/wave_writer.c \
@@ -71,6 +73,9 @@ ZLIB_SRC:=zlib/adler32.c \
 	zlib/uncompr.c \
 	zlib/zutil.c 
 
+
+.PHONY: all clean
+
 all: zlib.stamp ym2413.stamp $(TARGET)
 
 zlib.stamp:
@@ -83,14 +88,28 @@ ym2413.stamp:
 	touch $@
 
 clean:
-	rm -f $(TARGET) $(TARGET).sym mo_ym2413_emu.zip *.stamp
+	rm -f $(TARGET) $(TARGET).sym $(TARGET).map mo_ym2413_emu.zip *.stamp -r $(OUTDIR)
 
 libgme/gme/Ym2413_Emu.cpp: ym2413.stamp
 
-$(TARGET).sym: $(SRC) libgme/gme/Ym2413_Emu.cpp $(ZLIB_SRC)
+SRCS:=$(SRC) libgme/gme/Ym2413_Emu.cpp $(ZLIB_SRC)
+OBJS =$(addprefix $(OUTDIR)/,$(filter %.o,$(SRCS:.cpp=.o)))
+OBJS+=$(addprefix $(OUTDIR)/,$(filter %.o,$(SRCS:.c=.o)))
+
+$(shell mkdir -p $(OUTDIR) $(dir $(OBJS)) > /dev/null)
+
+$(OUTDIR)/%.o: %.c
+	$(GPP) $(CFLAGS) -c -o $@ $<
+
+$(OUTDIR)/%.o: %.cpp
+	$(GPP) $(CFLAGS) -c -o $@ $<
+
+$(TARGET).sym: $(OBJS)
 	$(GPP) $(CFLAGS) -Wl,-Map,$(TARGET).map,--cref $^ -o $@
 
 $(TARGET): $(TARGET).sym
 	$(STRIP) $^ -o $@
 
+DEPS=$(OBJS:.o=.d)
+-include $(DEPS)
  
