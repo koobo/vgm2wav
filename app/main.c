@@ -502,7 +502,7 @@ trackLoop:
         if (outputPcm)
         {
             //if (!fwrite(buf, sizeof(short), BUF_SIZE, curfile))
-            if (write(curfile_, buf, BUF_SIZE * sizeof(short) == -1))
+            if (write(curfile_, buf, BUF_SIZE * sizeof(short)) == -1)
             {
                 fprintf(stderr, "Error writing output\n");
                 cleanUp();
